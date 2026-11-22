@@ -45,7 +45,7 @@ class Speaker(nn.Module):
 
     def _init_state(self, x):
             """Initial (h, c) of the LSTM: h from the object, c = 0. Shapes [1, B, H]."""
-            h0 = self.obj_to_h(x).unsqueeze(0)
+            h0 = self.obj_to_hidden(x).unsqueeze(0)
             return h0, torch.zeros_like(h0)
     
     def _inputs(self, x, tokens):
@@ -57,10 +57,7 @@ class Speaker(nn.Module):
             return emb
     def forward(self, x, greedy=False):
             """Sample (or greedily decode) messages.
-    
-            Returns messages [B, T], summed log-probs [B] and summed per-step
-            policy entropies [B].
-            """
+            Returns messages [B, T], summed log-probs [B] and summed per-step policy entropies [B]. """
             B = x.shape[0]
             
             state = self._init_state(x)

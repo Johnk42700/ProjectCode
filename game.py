@@ -49,32 +49,25 @@ class ObjectSpace:
 
     def onehot(self, idx):
             """One-hot encoding [B, K*V] of the objects with indices idx.
-    
-            Example with K=2, V=3: object (2, 0) -> [0,0,1, 1,0,0].
-            This vector is the speaker's input.
-            """
+            Example with K=2, V=3: object (2, 0) -> [0,0,1, 1,0,0]. This vector is the speaker's input. """
             obj = self.objects[idx]
             return F.one_hot(obj, self.V).float().view(len(idx), -1)
 
     def sample_train(self, batch_size, gen=None):
             """Indices of batch_size training objects drawn uniformly with replacement.
-    
-            The training set has 204 objects, so a batch of 256 contains repeats.
-            """
+            The training set has 204 objects, so a batch of 256 contains repeats."""
+            
             pos = torch.randint(len(self.train_idx), (batch_size,), generator=gen)
             return self.train_idx[pos]
 
 def attribute_nll(listener_logits, objects):
     """Per-example joint negative log-likelihood -log rho(x|m) = -sum_k log rho_k(x_k|m).
-
     listener_logits: [B, K, V]; objects: [B, K]. Returns [B].
-
     This one quantity plays three roles in the code:
-      * it is the listener's supervised training loss (cross-entropy summed over
+      it is the listener's supervised training loss (cross-entropy summed over
         the K attributes),
-      * its negative (divided by K) is the speaker's REINFORCE reward,
-      * its average is the "listener loss" that the diagnostic splits into an
-        information part and a co-adaptation part.
-    """
+      its negative (divided by K) is the speaker's REINFORCE reward,
+      its average is the "listener loss" that the diagnostic splits into an
+        information part and a co-adaptation part. """
     logp = F.log_softmax(listener_logits, dim=-1)  # log rho_k(v | m) for all k, v pick, for every attribute, the log-probability of the true value and sum over attributes
     return -logp.gather(-1, objects.unsqueeze(-1)).squeeze(-1).sum(-1)
