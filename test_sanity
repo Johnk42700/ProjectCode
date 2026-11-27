@@ -1,0 +1,51 @@
+"""Some sanity checks for the game and the agents. """
+
+import os
+import sys
+
+import numpy as np
+import torch
+
+from agents import Listener, Speaker  
+from game import ObjectSpace, attribute_nll  
+
+def test_object_space():
+    """256 objects. a seed-dependent 204/52 split, and the one-hot encoding of the speaker's input."""
+    space = ObjectSpace()
+    assert space.n_objects == 256
+    assert len(space.train_idx) == 204 and len(space.test_idx) == 52
+    assert len(set(space.train_idx.tolist()) & set(space.test_idx.tolist())) == 0
+    assert torch.equal(ObjectSpace(seed=3).train_idx, ObjectSpace(seed=3).train_idx)
+    assert not torch.equal(ObjectSpace(seed=3).train_idx, ObjectSpace(seed=4).train_idx)
+    x = space.onehot(torch.tensor([0, 255]))
+    assert x.shape == (2, 16) and x.sum(1).tolist() == [4, 4]
+
+def test_attribute_nll():
+    """A listener with uniform logits has loss K log V; a confident correct one has loss ~0."""
+    objs = torch.tensor([[0, 1, 2, 3]])
+    uniform = torch.zeros(1, 4, 4)
+    assert abs(float(attribute_nll(uniform, objs)) - 4 * np.log(4)) < 1e-5
+    sure = torch.full((1, 4, 4), -50.0)
+    sure[0, torch.arange(4), objs[0]] = 50.0
+    assert float(attribute_nll(sure, objs)) < 1e-6
+
+def test_speaker_log_prob_matches_sampling():
+    """log_prob (teacher forcing) must give the same log pi(m|x) as forward (sampling)."""
+    torch.manual_seed(0)
+    space = ObjectSpace()
+    S = Speaker(16, hidden=32, obj_input=True)
+    x = space.onehot(torch.arange(20))
+    msgs, logp, _ = S(x)
+    assert msgs.shape == (20, 10)
+    assert torch.allclose(S.log_prob(x, msgs), logp, atol=1e-5)
+
+def test_listener_output_shape():
+    L = Listener(4, 4, hidden=32)
+    assert L(torch.randint(20, (5, 10))).shape == (5, 4, 4)
+
+
+if __name__ == "__main__":
+    for name, fn in list(globals().items()):
+        if name.startswith("test_"):
+            fn()
+            print("ok", name)
